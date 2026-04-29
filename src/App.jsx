@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { useUser } from '@clerk/clerk-react';
 import { LandingPage } from './pages/LandingPage';
 import { StorePage } from './pages/StorePage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { CartPage } from './pages/CartPage';
 import { AdminPage } from './pages/AdminPage';
-import { ClerkSignInModal, ClerkSignUpModal } from './components/ClerkAuthUI';
+import { AuthModal } from './components/AuthModal';
 import { TweaksPanel, TweakSection, TweakToggle, TweakColor } from './components/TweaksPanel';
 import { useTweaks } from './hooks/useTweaks';
 
@@ -13,84 +12,84 @@ const INITIAL_PRODUCTS = [
   {
     id: 1, name: 'Oxygen Concentrator 5L', brand: 'OxygenPro', category: 'Oxygen Products',
     price: 4999, stock: 8,
-    description: 'Medical-grade 5 litre per minute oxygen concentrator suitable for home and clinical use. Features continuous flow technology with whisper-quiet operation and energy-efficient motor.',
+    description: 'Medical-grade 5 litre per minute oxygen concentrator suitable for home and clinical use.',
     features: ['5L/min continuous flow', 'Medical-grade purity (93±3%)', 'Low noise — 42dB', 'Built-in alarm system', '2-year warranty'],
     active: true,
   },
   {
     id: 2, name: 'CPAP Auto Machine', brand: 'SleepWell', category: 'Oxygen Products',
     price: 8500, stock: 4,
-    description: 'Auto-adjusting CPAP machine for sleep apnoea therapy. Intelligent pressure adjustment ensures maximum comfort throughout the night.',
+    description: 'Auto-adjusting CPAP machine for sleep apnoea therapy.',
     features: ['Auto pressure 4–20 cmH₂O', 'Integrated humidifier', 'Data recording & app sync', 'Travel-ready compact design', '5-year warranty'],
     active: true,
   },
   {
     id: 3, name: 'Nebulizer Compressor Kit', brand: 'MedAir', category: 'Oxygen Products',
     price: 1299, stock: 15,
-    description: 'Professional compressor nebulizer for effective inhalation therapy. Converts liquid medication into fine mist for direct delivery to the lungs.',
+    description: 'Professional compressor nebulizer for effective inhalation therapy.',
     features: ['0.5 ml/min nebulization rate', 'MMAD ≤ 5 μm particle size', 'Complete mask & tubing kit', 'Child and adult masks included'],
     active: true,
   },
   {
     id: 4, name: 'Fingertip Pulse Oximeter', brand: 'VitalCheck', category: 'Oxygen Products',
     price: 599, stock: 22,
-    description: 'Accurate fingertip pulse oximeter for measuring blood oxygen saturation (SpO2) and pulse rate. Large OLED display for easy reading.',
+    description: 'Accurate fingertip pulse oximeter for measuring blood oxygen saturation (SpO2) and pulse rate.',
     features: ['SpO2 accuracy ±2%', 'Pulse rate 30–250 bpm', 'Auto power-off', 'Includes carry pouch & lanyard'],
     active: true,
   },
   {
     id: 5, name: 'Whey Protein Isolate 1kg', brand: 'NutriForce', category: 'Supplements',
     price: 599, stock: 30,
-    description: 'Premium whey protein isolate providing 27g of protein per serving with minimal carbohydrates and fat. Ideal for muscle recovery and growth.',
+    description: 'Premium whey protein isolate providing 27g of protein per serving.',
     features: ['27g protein per 30g serving', 'Less than 1g fat', 'Instantised for easy mixing', 'Available in Chocolate & Vanilla'],
     active: true,
   },
   {
     id: 6, name: 'Immune Boost Complex', brand: 'VitaShield', category: 'Supplements',
     price: 279, stock: 45,
-    description: 'Advanced immune support formula combining Vitamin C, Zinc, Elderberry and Echinacea to strengthen your body\'s natural defences.',
+    description: 'Advanced immune support formula combining Vitamin C, Zinc, Elderberry and Echinacea.',
     features: ['1000mg Vitamin C per serving', '15mg Zinc', 'Elderberry & Echinacea extract', '60 capsules per bottle'],
     active: true,
   },
   {
     id: 7, name: 'Marine Collagen Peptides', brand: 'RenewSkin', category: 'Wellness',
     price: 449, stock: 18,
-    description: 'Hydrolysed marine collagen peptides for skin elasticity, joint health and gut lining support. Unflavoured and easily dissolved in any drink.',
+    description: 'Hydrolysed marine collagen peptides for skin elasticity, joint health and gut lining support.',
     features: ['10g collagen per serving', 'Type I & III collagen', 'Unflavoured — mixes clear', 'Sustainably sourced'],
     active: true,
   },
   {
     id: 8, name: 'Omega-3 Fish Oil 90 Caps', brand: 'DeepSea', category: 'Supplements',
     price: 199, stock: 60,
-    description: 'High-potency omega-3 fatty acids (EPA & DHA) sourced from wild-caught deep-sea fish. Supports heart, brain and joint health.',
+    description: 'High-potency omega-3 fatty acids (EPA & DHA) sourced from wild-caught deep-sea fish.',
     features: ['1000mg fish oil per capsule', '180mg EPA / 120mg DHA', 'Enteric-coated (no fishy aftertaste)', 'Third-party tested'],
     active: true,
   },
   {
     id: 9, name: 'Magnesium Glycinate 120 Caps', brand: 'CalmoMag', category: 'Supplements',
     price: 249, stock: 3,
-    description: 'Highly bioavailable magnesium glycinate for muscle relaxation, improved sleep quality and stress reduction.',
+    description: 'Highly bioavailable magnesium glycinate for muscle relaxation and improved sleep.',
     features: ['400mg magnesium per serving', 'Glycinate form — superior absorption', 'Supports deep sleep', 'Non-laxative formula'],
     active: true,
   },
   {
     id: 10, name: 'Foam Roller Pro 60cm', brand: 'ActiveBody', category: 'Recovery',
     price: 349, stock: 12,
-    description: 'High-density EVA foam roller for myofascial release and muscle recovery. Textured surface targets deep tissue for effective recovery.',
+    description: 'High-density EVA foam roller for myofascial release and muscle recovery.',
     features: ['High-density EVA foam', '60cm length, 15cm diameter', 'Grid texture for targeted relief', 'Supports up to 120kg'],
     active: true,
   },
   {
     id: 11, name: 'Joint Support Formula', brand: 'FlexHealth', category: 'Supplements',
     price: 329, stock: 0,
-    description: 'Comprehensive joint health supplement combining glucosamine, chondroitin and MSM for cartilage support and reduced inflammation.',
+    description: 'Comprehensive joint health supplement combining glucosamine, chondroitin and MSM.',
     features: ['1500mg Glucosamine', '1200mg Chondroitin', '500mg MSM', '90 tablets per bottle'],
     active: true,
   },
   {
     id: 12, name: 'Vitamin D3 + K2 Drops', brand: 'SunVita', category: 'Wellness',
     price: 189, stock: 35,
-    description: 'Liquid vitamin D3 combined with K2 (MK-7) for optimal calcium absorption, immune function and bone density support.',
+    description: 'Liquid vitamin D3 combined with K2 (MK-7) for optimal calcium absorption.',
     features: ['2000 IU Vitamin D3 per drop', '100mcg Vitamin K2 (MK-7)', 'MCT oil base for absorption', '30ml — approx 900 drops'],
     active: true,
   },
@@ -112,38 +111,29 @@ const INITIAL_ORDERS = [
 ];
 
 export function App() {
-  const { user, isLoaded } = useUser();
   const [page, setPage] = useState('landing');
-  const [showSignIn, setShowSignIn] = useState(false);
-  const [showSignUp, setShowSignUp] = useState(false);
+  const [user, setUser] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState('signin');
   const [cart, setCart] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [orders, setOrders] = useState(INITIAL_ORDERS);
 
-  const TWEAK_DEFAULTS = {
-    "accentColor": "#2BB5C8",
-    "darkNav": true,
-    "roundedCards": true
-  };
+  const TWEAK_DEFAULTS = { accentColor: '#2BB5C8', darkNav: true, roundedCards: true };
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
-  // If Clerk is still loading, show nothing or a loading screen
-  if (!isLoaded) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F5F8FA' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 24, color: '#2BB5C8', marginBottom: 16 }}>●●●</div>
-        <div style={{ color: '#9AABB0' }}>Loading...</div>
-      </div>
-    </div>;
-  }
-
-  // Auto-redirect authenticated user away from landing
-  if (user && page === 'landing') {
-    setPage('store');
-  }
-
   const navigate = (pg) => setPage(pg);
+
+  const handleShowAuth = (mode) => { setAuthMode(mode); setShowAuth(true); };
+
+  const handleAuth = (userData) => {
+    setUser(userData);
+    setShowAuth(false);
+    setPage('store');
+  };
+
+  const handleLogout = () => { setUser(null); setCart([]); setPage('landing'); };
 
   const handleAddToCart = (product, qty = 1) => {
     setCart(prev => {
@@ -168,8 +158,8 @@ export function App() {
     const orderTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const newOrder = {
       id: 'RNW-' + Math.floor(10000 + Math.random() * 90000),
-      customer: user?.fullName || 'Customer',
-      email: user?.emailAddresses[0]?.emailAddress || '',
+      customer: user?.name || 'Customer',
+      email: user?.email || '',
       itemCount: cart.reduce((s, i) => s + i.qty, 0),
       total: orderTotal,
       date: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
@@ -196,8 +186,14 @@ export function App() {
   return (
     <div style={accentStyle}>
       {page === 'landing' && !user && (
-        <LandingPage onNavigate={navigate} onShowSignIn={() => setShowSignIn(true)} onShowSignUp={() => setShowSignUp(true)} />
+        <LandingPage
+          onNavigate={navigate}
+          onShowSignIn={() => handleShowAuth('signin')}
+          onShowSignUp={() => handleShowAuth('signup')}
+        />
       )}
+
+      {page === 'landing' && user && (() => { navigate('store'); return null; })()}
 
       {page === 'store' && user && (
         <StorePage
@@ -205,12 +201,8 @@ export function App() {
           cart={cart}
           onAddToCart={handleAddToCart}
           onViewProduct={handleViewProduct}
-          user={{
-            name: user.fullName || user.emailAddresses[0]?.emailAddress?.split('@')[0] || 'User',
-            email: user.emailAddresses[0]?.emailAddress || '',
-            isAdmin: user.publicMetadata?.isAdmin === true,
-          }}
-          onLogout={() => {}}
+          user={user}
+          onLogout={handleLogout}
           onNavigate={navigate}
         />
       )}
@@ -235,7 +227,7 @@ export function App() {
         />
       )}
 
-      {page === 'admin' && user?.publicMetadata?.isAdmin && (
+      {page === 'admin' && user?.isAdmin && (
         <AdminPage
           products={products}
           orders={orders}
@@ -245,11 +237,8 @@ export function App() {
         />
       )}
 
-      {!user && (
-        <>
-          <ClerkSignInModal isOpen={showSignIn} onClose={() => setShowSignIn(false)} />
-          <ClerkSignUpModal isOpen={showSignUp} onClose={() => setShowSignUp(false)} />
-        </>
+      {showAuth && (
+        <AuthModal mode={authMode} onClose={() => setShowAuth(false)} onAuth={handleAuth} />
       )}
 
       <TweaksPanel>
