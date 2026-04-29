@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useUser, useClerk } from '@clerk/clerk-react';
 import { LandingPage } from './pages/LandingPage';
 import { StorePage } from './pages/StorePage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { CartPage } from './pages/CartPage';
 import { AdminPage } from './pages/AdminPage';
-import { AuthModal } from './components/AuthModal';
+import { ClerkSignInModal, ClerkSignUpModal } from './components/ClerkAuthUI';
 import { TweaksPanel, TweakSection, TweakToggle, TweakColor } from './components/TweaksPanel';
 import { useTweaks } from './hooks/useTweaks';
 
@@ -111,8 +112,18 @@ const INITIAL_ORDERS = [
 ];
 
 export function App() {
+  const { user: clerkUser, isLoaded } = useUser();
+  const { signOut } = useClerk();
+
+  const user = clerkUser ? {
+    id: clerkUser.id,
+    name: clerkUser.fullName || clerkUser.emailAddresses[0]?.emailAddress?.split('@')[0] || 'User',
+    email: clerkUser.emailAddresses[0]?.emailAddress || '',
+    isAdmin: clerkUser.publicMetadata?.isAdmin === true,
+    avatar: clerkUser.imageUrl,
+  } : null;
+
   const [page, setPage] = useState('landing');
-  const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('signin');
   const [cart, setCart] = useState([]);
@@ -125,15 +136,20 @@ export function App() {
 
   const navigate = (pg) => setPage(pg);
 
+  useEffect(() => {
+    if (isLoaded && user && page === 'landing') {
+      setPage('store');
+      setShowAuth(false);
+    }
+  }, [isLoaded, user]);
+
   const handleShowAuth = (mode) => { setAuthMode(mode); setShowAuth(true); };
 
-  const handleAuth = (userData) => {
-    setUser(userData);
-    setShowAuth(false);
-    setPage('store');
+  const handleLogout = () => {
+    signOut();
+    setCart([]);
+    setPage('landing');
   };
-
-  const handleLogout = () => { setUser(null); setCart([]); setPage('landing'); };
 
   const handleAddToCart = (product, qty = 1) => {
     setCart(prev => {
@@ -183,19 +199,32 @@ export function App() {
 
   const accentStyle = { '--accent': tweaks.accentColor || '#2BB5C8' };
 
+  if (!isLoaded) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0d2b35', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#2BB5C8,#1A8A9A)', margin: '0 auto 16px' }} />
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#2BB5C8', letterSpacing: '-0.01em' }}>RENEW</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>Loading…</div>
+        </div>
+      </div>
+    );
+  }
+
+  const authedPage = user ? page : 'landing';
+
   return (
     <div style={accentStyle}>
-      {page === 'landing' && !user && (
+      {authedPage === 'landing' && (
         <LandingPage
           onNavigate={navigate}
           onShowSignIn={() => handleShowAuth('signin')}
           onShowSignUp={() => handleShowAuth('signup')}
+          user={user}
         />
       )}
 
-      {page === 'landing' && user && (() => { navigate('store'); return null; })()}
-
-      {page === 'store' && user && (
+      {authedPage === 'store' && user && (
         <StorePage
           products={products}
           cart={cart}
@@ -207,7 +236,7 @@ export function App() {
         />
       )}
 
-      {page === 'product' && user && selectedProduct && (
+      {authedPage === 'product' && user && selectedProduct && (
         <ProductDetailPage
           product={selectedProduct}
           cart={cart}
@@ -217,7 +246,7 @@ export function App() {
         />
       )}
 
-      {page === 'cart' && user && (
+      {authedPage === 'cart' && user && (
         <CartPage
           cart={cart}
           onUpdateCart={handleUpdateCart}
@@ -227,7 +256,7 @@ export function App() {
         />
       )}
 
-      {page === 'admin' && user?.isAdmin && (
+      {authedPage === 'admin' && user?.isAdmin && (
         <AdminPage
           products={products}
           orders={orders}
@@ -237,9 +266,16 @@ export function App() {
         />
       )}
 
-      {showAuth && (
-        <AuthModal mode={authMode} onClose={() => setShowAuth(false)} onAuth={handleAuth} />
-      )}
+      <ClerkSignInModal
+        isOpen={showAuth && authMode === 'signin'}
+        onClose={() => setShowAuth(false)}
+        onSuccess={() => { setShowAuth(false); navigate('store'); }}
+      />
+      <ClerkSignUpModal
+        isOpen={showAuth && authMode === 'signup'}
+        onClose={() => setShowAuth(false)}
+        onSuccess={() => { setShowAuth(false); navigate('store'); }}
+      />
 
       <TweaksPanel>
         <TweakSection label="Brand">
