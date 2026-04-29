@@ -36,7 +36,7 @@ const btnSt = {
 function AuthModal({ isOpen, onClose, children }) {
   if (!isOpen) return null;
   return (
-    <div style={overlayStyle} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div style={overlayStyle}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px 0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
