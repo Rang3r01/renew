@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useClerk, AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
 import { LandingPage } from './pages/LandingPage';
 import { StorePage } from './pages/StorePage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
@@ -10,6 +10,19 @@ import { TweaksPanel, TweakSection, TweakToggle, TweakColor } from './components
 import { useTweaks } from './hooks/useTweaks';
 import { useProducts } from './hooks/useProducts';
 import { useOrders } from './hooks/useOrders';
+
+function SSOCallback() {
+  return (
+    <div style={{ minHeight: '100vh', background: '#0d2b35', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'linear-gradient(135deg,#2BB5C8,#1A8A9A)', margin: '0 auto 16px' }} />
+        <div style={{ fontSize: 22, fontWeight: 800, color: '#2BB5C8', letterSpacing: '-0.01em' }}>RENEW</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>Signing you in…</div>
+      </div>
+      <AuthenticateWithRedirectCallback />
+    </div>
+  );
+}
 
 export function App() {
   const { user: clerkUser, isLoaded } = useUser();
@@ -99,6 +112,10 @@ export function App() {
   const handleViewProduct = (product) => { setSelectedProduct(product); setPage('product'); };
 
   const accentStyle = { '--accent': tweaks.accentColor || '#2BB5C8' };
+
+  if (window.location.pathname === '/sso-callback') {
+    return <SSOCallback />;
+  }
 
   if (!isLoaded || (user && (productsLoading || ordersLoading))) {
     return (
