@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 
 const STATUS_STYLES = {
@@ -8,7 +8,7 @@ const STATUS_STYLES = {
   cancelled:  { background: '#FEF2F2', color: '#DC2626' },
 };
 
-const EMPTY_PRODUCT = { name:'', brand:'', category:'Supplements', price:'', stock:'', description:'', features:'', active:true, image:null };
+const EMPTY_PRODUCT = { name:'', brand:'', category:'Supplements', price:'', stock:'', description:'', features:'', active:true, image:null, image_url:'', _isNew:true };
 
 const CATEGORIES = ['Oxygen Products','Supplements','Recovery','Wellness'];
 
@@ -21,6 +21,8 @@ export function AdminPage({ products, orders, onSaveProduct, onDeleteProduct, on
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const imageFileRef = useRef(null);
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
   const revenueLabel = totalRevenue >= 1000
@@ -39,22 +41,27 @@ export function AdminPage({ products, orders, onSaveProduct, onDeleteProduct, on
     return acc;
   }, []);
 
-  const openAdd = () => { setEditProduct({ ...EMPTY_PRODUCT }); setShowForm(true); };
-  const openEdit = (p) => { setEditProduct({ ...p, features: (p.features || []).join('\n') }); setShowForm(true); };
-  const handleSave = () => {
+  const openAdd = () => { imageFileRef.current = null; setEditProduct({ ...EMPTY_PRODUCT }); setShowForm(true); };
+  const openEdit = (p) => { imageFileRef.current = null; setEditProduct({ ...p, features: (p.features || []).join('\n') }); setShowForm(true); };
+  const handleSave = async () => {
     if (!editProduct.name || !editProduct.price) return;
-    onSaveProduct({
-      ...editProduct,
-      price: parseFloat(editProduct.price),
-      stock: parseInt(editProduct.stock) || 0,
-      features: editProduct.features ? editProduct.features.split('\n').filter(Boolean) : [],
-      id: editProduct.id || Date.now(),
-    });
+    setSaving(true);
+    await onSaveProduct(
+      {
+        ...editProduct,
+        price: parseFloat(editProduct.price),
+        stock: parseInt(editProduct.stock) || 0,
+        features: editProduct.features ? editProduct.features.split('\n').filter(Boolean) : [],
+      },
+      imageFileRef.current,
+    );
+    setSaving(false);
     setShowForm(false);
   };
   const handleDelete = (id) => { onDeleteProduct(id); setDeleteConfirm(null); };
   const handleImageUpload = (e) => {
     const file = e.target.files[0]; if (!file) return;
+    imageFileRef.current = file;
     const reader = new FileReader();
     reader.onload = (ev) => setEditProduct(p => ({ ...p, image: ev.target.result }));
     reader.readAsDataURL(file);
@@ -477,8 +484,8 @@ export function AdminPage({ products, orders, onSaveProduct, onDeleteProduct, on
             </div>
           </div>
           <div style={{ display:'flex', justifyContent:'flex-end', gap:10, padding:'14px 22px', borderTop:'1px solid #E8EEF0', position:'sticky', bottom:0, background:'#fff' }}>
-            <button style={{ background:'#F5F8FA', color:'#4A6068', border:'1.5px solid #DDE4E8', borderRadius:8, padding:'10px 18px', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }} onClick={() => setShowForm(false)}>Cancel</button>
-            <button style={{ background:'#2BB5C8', color:'#fff', border:'none', borderRadius:8, padding:'10px 22px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }} onClick={handleSave}>{editProduct.id ? 'Save Changes' : 'Add Product'}</button>
+            <button style={{ background:'#F5F8FA', color:'#4A6068', border:'1.5px solid #DDE4E8', borderRadius:8, padding:'10px 18px', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:"'DM Sans',sans-serif" }} onClick={() => setShowForm(false)} disabled={saving}>Cancel</button>
+            <button style={{ background: saving ? '#9AABB0' : '#2BB5C8', color:'#fff', border:'none', borderRadius:8, padding:'10px 22px', fontSize:14, fontWeight:700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily:"'DM Sans',sans-serif" }} onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : editProduct.id && !editProduct._isNew ? 'Save Changes' : 'Add Product'}</button>
           </div>
         </Modal>
       )}

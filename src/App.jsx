@@ -8,108 +8,8 @@ import { AdminPage } from './pages/AdminPage';
 import { ClerkSignInModal, ClerkSignUpModal } from './components/ClerkAuthUI';
 import { TweaksPanel, TweakSection, TweakToggle, TweakColor } from './components/TweaksPanel';
 import { useTweaks } from './hooks/useTweaks';
-
-const INITIAL_PRODUCTS = [
-  {
-    id: 1, name: 'Oxygen Concentrator 5L', brand: 'OxygenPro', category: 'Oxygen Products',
-    price: 4999, stock: 8,
-    description: 'Medical-grade 5 litre per minute oxygen concentrator suitable for home and clinical use.',
-    features: ['5L/min continuous flow', 'Medical-grade purity (93±3%)', 'Low noise — 42dB', 'Built-in alarm system', '2-year warranty'],
-    active: true,
-  },
-  {
-    id: 2, name: 'CPAP Auto Machine', brand: 'SleepWell', category: 'Oxygen Products',
-    price: 8500, stock: 4,
-    description: 'Auto-adjusting CPAP machine for sleep apnoea therapy.',
-    features: ['Auto pressure 4–20 cmH₂O', 'Integrated humidifier', 'Data recording & app sync', 'Travel-ready compact design', '5-year warranty'],
-    active: true,
-  },
-  {
-    id: 3, name: 'Nebulizer Compressor Kit', brand: 'MedAir', category: 'Oxygen Products',
-    price: 1299, stock: 15,
-    description: 'Professional compressor nebulizer for effective inhalation therapy.',
-    features: ['0.5 ml/min nebulization rate', 'MMAD ≤ 5 μm particle size', 'Complete mask & tubing kit', 'Child and adult masks included'],
-    active: true,
-  },
-  {
-    id: 4, name: 'Fingertip Pulse Oximeter', brand: 'VitalCheck', category: 'Oxygen Products',
-    price: 599, stock: 22,
-    description: 'Accurate fingertip pulse oximeter for measuring blood oxygen saturation (SpO2) and pulse rate.',
-    features: ['SpO2 accuracy ±2%', 'Pulse rate 30–250 bpm', 'Auto power-off', 'Includes carry pouch & lanyard'],
-    active: true,
-  },
-  {
-    id: 5, name: 'Whey Protein Isolate 1kg', brand: 'NutriForce', category: 'Supplements',
-    price: 599, stock: 30,
-    description: 'Premium whey protein isolate providing 27g of protein per serving.',
-    features: ['27g protein per 30g serving', 'Less than 1g fat', 'Instantised for easy mixing', 'Available in Chocolate & Vanilla'],
-    active: true,
-  },
-  {
-    id: 6, name: 'Immune Boost Complex', brand: 'VitaShield', category: 'Supplements',
-    price: 279, stock: 45,
-    description: 'Advanced immune support formula combining Vitamin C, Zinc, Elderberry and Echinacea.',
-    features: ['1000mg Vitamin C per serving', '15mg Zinc', 'Elderberry & Echinacea extract', '60 capsules per bottle'],
-    active: true,
-  },
-  {
-    id: 7, name: 'Marine Collagen Peptides', brand: 'RenewSkin', category: 'Wellness',
-    price: 449, stock: 18,
-    description: 'Hydrolysed marine collagen peptides for skin elasticity, joint health and gut lining support.',
-    features: ['10g collagen per serving', 'Type I & III collagen', 'Unflavoured — mixes clear', 'Sustainably sourced'],
-    active: true,
-  },
-  {
-    id: 8, name: 'Omega-3 Fish Oil 90 Caps', brand: 'DeepSea', category: 'Supplements',
-    price: 199, stock: 60,
-    description: 'High-potency omega-3 fatty acids (EPA & DHA) sourced from wild-caught deep-sea fish.',
-    features: ['1000mg fish oil per capsule', '180mg EPA / 120mg DHA', 'Enteric-coated (no fishy aftertaste)', 'Third-party tested'],
-    active: true,
-  },
-  {
-    id: 9, name: 'Magnesium Glycinate 120 Caps', brand: 'CalmoMag', category: 'Supplements',
-    price: 249, stock: 3,
-    description: 'Highly bioavailable magnesium glycinate for muscle relaxation and improved sleep.',
-    features: ['400mg magnesium per serving', 'Glycinate form — superior absorption', 'Supports deep sleep', 'Non-laxative formula'],
-    active: true,
-  },
-  {
-    id: 10, name: 'Foam Roller Pro 60cm', brand: 'ActiveBody', category: 'Recovery',
-    price: 349, stock: 12,
-    description: 'High-density EVA foam roller for myofascial release and muscle recovery.',
-    features: ['High-density EVA foam', '60cm length, 15cm diameter', 'Grid texture for targeted relief', 'Supports up to 120kg'],
-    active: true,
-  },
-  {
-    id: 11, name: 'Joint Support Formula', brand: 'FlexHealth', category: 'Supplements',
-    price: 329, stock: 0,
-    description: 'Comprehensive joint health supplement combining glucosamine, chondroitin and MSM.',
-    features: ['1500mg Glucosamine', '1200mg Chondroitin', '500mg MSM', '90 tablets per bottle'],
-    active: true,
-  },
-  {
-    id: 12, name: 'Vitamin D3 + K2 Drops', brand: 'SunVita', category: 'Wellness',
-    price: 189, stock: 35,
-    description: 'Liquid vitamin D3 combined with K2 (MK-7) for optimal calcium absorption.',
-    features: ['2000 IU Vitamin D3 per drop', '100mcg Vitamin K2 (MK-7)', 'MCT oil base for absorption', '30ml — approx 900 drops'],
-    active: true,
-  },
-];
-
-const INITIAL_ORDERS = [
-  { id: 'RNW-10021', customer: 'Sarah van der Merwe', email: 'sarah@email.com', phone: '082 411 2233', itemCount: 3, total: 1847, date: '27 Apr 2026', status: 'delivered',
-    items: [{ name: 'Immune Boost Complex', brand: 'VitaShield', qty: 2, price: 279 }, { name: 'Omega-3 Fish Oil 90 Caps', brand: 'DeepSea', qty: 1, price: 199 }, { name: 'Magnesium Glycinate 120 Caps', brand: 'CalmoMag', qty: 3, price: 249 }] },
-  { id: 'RNW-10022', customer: 'Pieter Botha', email: 'pieter@email.com', phone: '073 552 8810', itemCount: 1, total: 4999, date: '26 Apr 2026', status: 'confirmed',
-    items: [{ name: 'Oxygen Concentrator 5L', brand: 'OxygenPro', qty: 1, price: 4999 }] },
-  { id: 'RNW-10023', customer: 'Nomsa Dlamini', email: 'nomsa@email.com', phone: '060 123 9988', itemCount: 4, total: 1316, date: '26 Apr 2026', status: 'pending',
-    items: [{ name: 'Vitamin D3 + K2 Drops', brand: 'SunVita', qty: 2, price: 189 }, { name: 'Marine Collagen Peptides', brand: 'RenewSkin', qty: 1, price: 449 }, { name: 'Immune Boost Complex', brand: 'VitaShield', qty: 1, price: 279 }] },
-  { id: 'RNW-10024', customer: 'Jan Erasmus', email: 'jan@email.com', phone: '082 776 3341', itemCount: 2, total: 8699, date: '25 Apr 2026', status: 'confirmed',
-    items: [{ name: 'CPAP Auto Machine', brand: 'SleepWell', qty: 1, price: 8500 }, { name: 'Fingertip Pulse Oximeter', brand: 'VitalCheck', qty: 1, price: 199 }] },
-  { id: 'RNW-10025', customer: 'Lerato Motsepe', email: 'lerato@email.com', phone: '071 908 5544', itemCount: 2, total: 578, date: '24 Apr 2026', status: 'delivered',
-    items: [{ name: 'Whey Protein Isolate 1kg', brand: 'NutriForce', qty: 1, price: 599 }] },
-  { id: 'RNW-10026', customer: 'Kobus Nel', email: 'kobus@email.com', phone: '083 441 7762', itemCount: 1, total: 8500, date: '23 Apr 2026', status: 'delivered',
-    items: [{ name: 'CPAP Auto Machine', brand: 'SleepWell', qty: 1, price: 8500 }] },
-];
+import { useProducts } from './hooks/useProducts';
+import { useOrders } from './hooks/useOrders';
 
 export function App() {
   const { user: clerkUser, isLoaded } = useUser();
@@ -123,13 +23,14 @@ export function App() {
     avatar: clerkUser.imageUrl,
   } : null;
 
+  const { products, loading: productsLoading, saveProduct, deleteProduct } = useProducts();
+  const { orders, loading: ordersLoading, createOrder } = useOrders();
+
   const [page, setPage] = useState('landing');
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('signin');
   const [cart, setCart] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
-  const [orders, setOrders] = useState(INITIAL_ORDERS);
 
   const TWEAK_DEFAULTS = { accentColor: '#2BB5C8', darkNav: true, roundedCards: true };
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
@@ -170,36 +71,36 @@ export function App() {
 
   const handleRemoveFromCart = (id) => setCart(prev => prev.filter(i => i.id !== id));
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     const orderTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const newOrder = {
       id: 'RNW-' + Math.floor(10000 + Math.random() * 90000),
       customer: user?.name || 'Customer',
       email: user?.email || '',
+      phone: '',
       itemCount: cart.reduce((s, i) => s + i.qty, 0),
       total: orderTotal,
       date: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
       status: 'pending',
+      items: cart.map(i => ({ name: i.name, brand: i.brand, qty: i.qty, price: i.price })),
     };
-    setOrders(prev => [newOrder, ...prev]);
+    await createOrder(newOrder);
     setCart([]);
   };
 
-  const handleSaveProduct = (product) => {
-    setProducts(prev => {
-      const existing = prev.find(p => p.id === product.id);
-      if (existing) return prev.map(p => p.id === product.id ? product : p);
-      return [...prev, product];
-    });
+  const handleSaveProduct = async (product, imageFile) => {
+    await saveProduct(product, imageFile);
   };
 
-  const handleDeleteProduct = (id) => setProducts(prev => prev.filter(p => p.id !== id));
+  const handleDeleteProduct = async (id) => {
+    await deleteProduct(id);
+  };
 
   const handleViewProduct = (product) => { setSelectedProduct(product); setPage('product'); };
 
   const accentStyle = { '--accent': tweaks.accentColor || '#2BB5C8' };
 
-  if (!isLoaded) {
+  if (!isLoaded || (user && (productsLoading || ordersLoading))) {
     return (
       <div style={{ minHeight: '100vh', background: '#0d2b35', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
