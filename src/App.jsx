@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { LandingPage } from './pages/LandingPage';
 import { StorePage } from './pages/StorePage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { CartPage } from './pages/CartPage';
 import { AdminPage } from './pages/AdminPage';
-import { AuthModal } from './components/AuthModal';
+import { ClerkSignInModal, ClerkSignUpModal } from './components/ClerkAuthUI';
 import { TweaksPanel, TweakSection, TweakToggle, TweakColor } from './components/TweaksPanel';
 import { useTweaks } from './hooks/useTweaks';
 
@@ -111,10 +112,10 @@ const INITIAL_ORDERS = [
 ];
 
 export function App() {
+  const { user, isLoaded } = useUser();
   const [page, setPage] = useState('landing');
-  const [user, setUser] = useState(null);
-  const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState('signin');
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
   const [cart, setCart] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
@@ -127,17 +128,22 @@ export function App() {
   };
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
-  const navigate = (pg) => setPage(pg);
+  // If Clerk is still loading, show nothing or a loading screen
+  if (!isLoaded) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F5F8FA' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 24, color: '#2BB5C8', marginBottom: 16 }}>●●●</div>
+        <div style={{ color: '#9AABB0' }}>Loading...</div>
+      </div>
+    </div>;
+  }
 
-  const handleShowAuth = (mode) => { setAuthMode(mode); setShowAuth(true); };
-
-  const handleAuth = (userData) => {
-    setUser(userData);
-    setShowAuth(false);
+  // Auto-redirect authenticated user away from landing
+  if (user && page === 'landing') {
     setPage('store');
-  };
+  }
 
-  const handleLogout = () => { setUser(null); setCart([]); setPage('landing'); };
+  const navigate = (pg) => setPage(pg);
 
   const handleAddToCart = (product, qty = 1) => {
     setCart(prev => {
@@ -162,8 +168,8 @@ export function App() {
     const orderTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
     const newOrder = {
       id: 'RNW-' + Math.floor(10000 + Math.random() * 90000),
-      customer: user?.name || 'Customer',
-      email: user?.email || '',
+      customer: user?.fullName || 'Customer',
+      email: user?.emailAddresses[0]?.emailAddress || '',
       itemCount: cart.reduce((s, i) => s + i.qty, 0),
       total: orderTotal,
       date: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
@@ -190,7 +196,7 @@ export function App() {
   return (
     <div style={accentStyle}>
       {page === 'landing' && !user && (
-        <LandingPage onNavigate={navigate} onShowAuth={handleShowAuth} />
+        <LandingPage onNavigate={navigate} onShowSignIn={() => setShowSignIn(true)} onShowSignUp={() => setShowSignUp(true)} />
       )}
 
       {page === 'store' && user && (
@@ -199,8 +205,12 @@ export function App() {
           cart={cart}
           onAddToCart={handleAddToCart}
           onViewProduct={handleViewProduct}
-          user={user}
-          onLogout={handleLogout}
+          user={{
+            name: user.fullName || user.emailAddresses[0]?.emailAddress?.split('@')[0] || 'User',
+            email: user.emailAddresses[0]?.emailAddress || '',
+            isAdmin: user.publicMetadata?.isAdmin === true,
+          }}
+          onLogout={() => {}}
           onNavigate={navigate}
         />
       )}
@@ -225,7 +235,7 @@ export function App() {
         />
       )}
 
-      {page === 'admin' && user?.isAdmin && (
+      {page === 'admin' && user?.publicMetadata?.isAdmin && (
         <AdminPage
           products={products}
           orders={orders}
@@ -235,10 +245,11 @@ export function App() {
         />
       )}
 
-      {page === 'landing' && user && navigate('store')}
-
-      {showAuth && (
-        <AuthModal mode={authMode} onClose={() => setShowAuth(false)} onAuth={handleAuth} />
+      {!user && (
+        <>
+          <ClerkSignInModal isOpen={showSignIn} onClose={() => setShowSignIn(false)} />
+          <ClerkSignUpModal isOpen={showSignUp} onClose={() => setShowSignUp(false)} />
+        </>
       )}
 
       <TweaksPanel>

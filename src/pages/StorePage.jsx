@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useClerk } from '@clerk/clerk-react';
 import { useResponsive } from '../hooks/useResponsive';
 
 export function StorePage({ products, cart, onAddToCart, onViewProduct, user, onLogout, onNavigate }) {
