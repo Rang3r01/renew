@@ -62,6 +62,10 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const reset = () => { setEmail(''); setPassword(''); setCode(''); setStage('credentials'); setError(''); };
+  const handleClose = () => { reset(); onClose(); };
+  const handleSuccess = () => { reset(); onSuccess?.(); };
+
   const handleCredentials = async (e) => {
     e.preventDefault();
     if (!isLoaded) return;
@@ -76,7 +80,7 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        onSuccess?.();
+        handleSuccess();
       } else if (result.status === 'needs_second_factor') {
         // Prepare email code as the second factor
         const emailFactor = result.supportedSecondFactors?.find(f => f.strategy === 'email_code');
@@ -105,7 +109,7 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
       const result = await signIn.attemptSecondFactor({ strategy: 'email_code', code });
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        onSuccess?.();
+        handleSuccess();
       } else {
         setError('Verification failed. Please try again.');
       }
@@ -117,7 +121,7 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
   };
 
   return (
-    <AuthModal isOpen={isOpen} onClose={onClose}>
+    <AuthModal isOpen={isOpen} onClose={handleClose}>
       <h2 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#1a2b30' }}>Sign in</h2>
       <p style={{ margin: '0 0 24px', fontSize: 14, color: '#9AABB0' }}>Welcome back to Renew Health Supplies</p>
 
@@ -167,6 +171,10 @@ export function ClerkSignUpModal({ isOpen, onClose, onSuccess }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const reset = () => { setFirstName(''); setLastName(''); setEmail(''); setPassword(''); setCode(''); setStage('form'); setError(''); };
+  const handleClose = () => { reset(); onClose(); };
+  const handleSuccess = () => { reset(); onSuccess?.(); };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isLoaded) return;
@@ -176,7 +184,7 @@ export function ClerkSignUpModal({ isOpen, onClose, onSuccess }) {
       const result = await signUp.create({ firstName, lastName, emailAddress: email, password });
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        onSuccess?.();
+        handleSuccess();
       } else if (result.status === 'missing_requirements') {
         // Email verification required
         await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
@@ -200,7 +208,7 @@ export function ClerkSignUpModal({ isOpen, onClose, onSuccess }) {
       const result = await signUp.attemptEmailAddressVerification({ code });
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        onSuccess?.();
+        handleSuccess();
       } else {
         setError('Verification failed. Please check the code and try again.');
       }
@@ -212,7 +220,7 @@ export function ClerkSignUpModal({ isOpen, onClose, onSuccess }) {
   };
 
   return (
-    <AuthModal isOpen={isOpen} onClose={onClose}>
+    <AuthModal isOpen={isOpen} onClose={handleClose}>
       <h2 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#1a2b30' }}>Create account</h2>
       <p style={{ margin: '0 0 24px', fontSize: 14, color: '#9AABB0' }}>Join Renew Health Supplies</p>
 
