@@ -57,6 +57,8 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
   const { signIn, setActive, isLoaded } = useSignIn();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [stage, setStage] = useState('credentials'); // 'credentials' | 'totp'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -68,7 +70,6 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
     try {
       let result = await signIn.create({ identifier: email, password });
 
-      // If password wasn't accepted as first factor, attempt it explicitly
       if (result.status === 'needs_first_factor') {
         result = await signIn.attemptFirstFactor({ strategy: 'password', password });
       }
@@ -77,7 +78,7 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
         await setActive({ session: result.createdSessionId });
         onSuccess?.();
       } else if (result.status === 'needs_second_factor') {
-        setError('Two-factor authentication is required. Please disable MFA in your Clerk account settings, then try again.');
+        setStage('totp');
       } else {
         setError(`Sign in failed (status: ${result.status}). Please try again.`);
       }
@@ -88,25 +89,62 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
+  const handleTotp = async (e) => {
+    e.preventDefault();
+    if (!isLoaded) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await signIn.attemptSecondFactor({ strategy: 'totp', code });
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        onSuccess?.();
+      } else {
+        setError('Verification failed. Please try again.');
+      }
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AuthModal isOpen={isOpen} onClose={onClose}>
       <h2 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#1a2b30' }}>Sign in</h2>
       <p style={{ margin: '0 0 24px', fontSize: 14, color: '#9AABB0' }}>Welcome back to Renew Health Supplies</p>
 
-      <form onSubmit={handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</label>
-          <input style={inputSt} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required autoFocus />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
-          <input style={inputSt} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-        </div>
-        {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
-        <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
+      {stage === 'credentials' ? (
+        <form onSubmit={handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</label>
+            <input style={inputSt} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required autoFocus />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
+            <input style={inputSt} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+          </div>
+          {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleTotp} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 14, color: '#4A6068' }}>Enter the 6-digit code from your authenticator app.</p>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Authenticator Code</label>
+            <input style={inputSt} type="text" inputMode="numeric" maxLength={6} value={code} onChange={e => setCode(e.target.value)} placeholder="123456" required autoFocus />
+          </div>
+          {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
+            {loading ? 'Verifying…' : 'Verify'}
+          </button>
+          <button type="button" style={{ background: 'none', border: 'none', color: '#9AABB0', fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }} onClick={() => { setStage('credentials'); setCode(''); setError(''); }}>
+            Back
+          </button>
+        </form>
+      )}
     </AuthModal>
   );
 }
