@@ -57,10 +57,12 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
   const { signIn, setActive, isLoaded } = useSignIn();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [stage, setStage] = useState('credentials'); // 'credentials' | 'verify'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleCredentials = async (e) => {
     e.preventDefault();
     if (!isLoaded) return;
     setLoading(true);
@@ -70,11 +72,42 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         onSuccess?.();
+      } else if (result.status === 'needs_second_factor') {
+        setStage('verify');
       } else {
-        setError('Sign in could not be completed. Please try again.');
+        // attempt first factor if not yet attempted
+        const firstFactor = result.supportedFirstFactors?.find(
+          f => f.strategy === 'email_code' || f.strategy === 'phone_code'
+        );
+        if (firstFactor) {
+          await signIn.prepareFirstFactor({ strategy: firstFactor.strategy, emailAddressId: firstFactor.emailAddressId });
+          setStage('verify');
+        } else {
+          setError(`Unexpected status: ${result.status}. Please try again.`);
+        }
       }
     } catch (err) {
-      setError(err.errors?.[0]?.message || 'Invalid email or password.');
+      setError(err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid email or password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    if (!isLoaded) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await signIn.attemptSecondFactor({ strategy: 'totp', code });
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        onSuccess?.();
+      } else {
+        setError('Verification failed. Please try again.');
+      }
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid code.');
     } finally {
       setLoading(false);
     }
@@ -84,20 +117,38 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
     <AuthModal isOpen={isOpen} onClose={onClose}>
       <h2 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#1a2b30' }}>Sign in</h2>
       <p style={{ margin: '0 0 24px', fontSize: 14, color: '#9AABB0' }}>Welcome back to Renew Health Supplies</p>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</label>
-          <input style={inputSt} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required autoFocus />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
-          <input style={inputSt} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-        </div>
-        {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
-        <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
+
+      {stage === 'credentials' ? (
+        <form onSubmit={handleCredentials} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</label>
+            <input style={inputSt} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required autoFocus />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
+            <input style={inputSt} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+          </div>
+          {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
+            {loading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 14, color: '#4A6068' }}>Enter the verification code from your authenticator app.</p>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification Code</label>
+            <input style={inputSt} type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="123456" required autoFocus />
+          </div>
+          {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
+            {loading ? 'Verifying…' : 'Verify'}
+          </button>
+          <button type="button" style={{ background: 'none', border: 'none', color: '#9AABB0', fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }} onClick={() => setStage('credentials')}>
+            Back
+          </button>
+        </form>
+      )}
     </AuthModal>
   );
 }
@@ -108,6 +159,8 @@ export function ClerkSignUpModal({ isOpen, onClose, onSuccess }) {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [stage, setStage] = useState('form'); // 'form' | 'verify'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -121,11 +174,35 @@ export function ClerkSignUpModal({ isOpen, onClose, onSuccess }) {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         onSuccess?.();
+      } else if (result.status === 'missing_requirements') {
+        // Email verification required
+        await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+        setStage('verify');
       } else {
-        setError('Registration could not be completed. Please try again.');
+        setError(`Unexpected status: ${result.status}. Please try again.`);
       }
     } catch (err) {
-      setError(err.errors?.[0]?.message || 'Could not create account. Please try again.');
+      setError(err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Could not create account. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    if (!isLoaded) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await signUp.attemptEmailAddressVerification({ code });
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        onSuccess?.();
+      } else {
+        setError('Verification failed. Please check the code and try again.');
+      }
+    } catch (err) {
+      setError(err.errors?.[0]?.longMessage || err.errors?.[0]?.message || 'Invalid code.');
     } finally {
       setLoading(false);
     }
@@ -135,30 +212,48 @@ export function ClerkSignUpModal({ isOpen, onClose, onSuccess }) {
     <AuthModal isOpen={isOpen} onClose={onClose}>
       <h2 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 800, color: '#1a2b30' }}>Create account</h2>
       <p style={{ margin: '0 0 24px', fontSize: 14, color: '#9AABB0' }}>Join Renew Health Supplies</p>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>First name</label>
-            <input style={inputSt} type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" required autoFocus />
+
+      {stage === 'form' ? (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>First name</label>
+              <input style={inputSt} type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Jane" required autoFocus />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Last name</label>
+              <input style={inputSt} type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Smith" />
+            </div>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Last name</label>
-            <input style={inputSt} type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Smith" />
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</label>
+            <input style={inputSt} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
           </div>
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</label>
-          <input style={inputSt} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
-        </div>
-        <div>
-          <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
-          <input style={inputSt} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-        </div>
-        {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
-        <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
-          {loading ? 'Creating account…' : 'Create account'}
-        </button>
-      </form>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Password</label>
+            <input style={inputSt} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+          </div>
+          {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
+            {loading ? 'Creating account…' : 'Create account'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 14, color: '#4A6068' }}>We sent a verification code to <strong>{email}</strong>. Enter it below.</p>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification Code</label>
+            <input style={inputSt} type="text" value={code} onChange={e => setCode(e.target.value)} placeholder="123456" required autoFocus />
+          </div>
+          {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
+          <button style={{ ...btnSt, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }} type="submit" disabled={loading}>
+            {loading ? 'Verifying…' : 'Verify email'}
+          </button>
+          <button type="button" style={{ background: 'none', border: 'none', color: '#9AABB0', fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }} onClick={() => setStage('form')}>
+            Back
+          </button>
+        </form>
+      )}
     </AuthModal>
   );
 }
