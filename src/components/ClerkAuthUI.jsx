@@ -58,7 +58,7 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
-  const [stage, setStage] = useState('credentials'); // 'credentials' | 'totp'
+  const [stage, setStage] = useState('credentials'); // 'credentials' | 'email_code'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -78,7 +78,14 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
         await setActive({ session: result.createdSessionId });
         onSuccess?.();
       } else if (result.status === 'needs_second_factor') {
-        setStage('totp');
+        // Prepare email code as the second factor
+        const emailFactor = result.supportedSecondFactors?.find(f => f.strategy === 'email_code');
+        if (emailFactor) {
+          await signIn.prepareSecondFactor({ strategy: 'email_code', emailAddressId: emailFactor.emailAddressId });
+        } else {
+          await signIn.prepareSecondFactor({ strategy: 'email_code' });
+        }
+        setStage('email_code');
       } else {
         setError(`Sign in failed (status: ${result.status}). Please try again.`);
       }
@@ -89,13 +96,13 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
-  const handleTotp = async (e) => {
+  const handleEmailCode = async (e) => {
     e.preventDefault();
     if (!isLoaded) return;
     setLoading(true);
     setError('');
     try {
-      const result = await signIn.attemptSecondFactor({ strategy: 'totp', code });
+      const result = await signIn.attemptSecondFactor({ strategy: 'email_code', code });
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         onSuccess?.();
@@ -130,10 +137,10 @@ export function ClerkSignInModal({ isOpen, onClose, onSuccess }) {
           </button>
         </form>
       ) : (
-        <form onSubmit={handleTotp} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <p style={{ margin: '0 0 8px', fontSize: 14, color: '#4A6068' }}>Enter the 6-digit code from your authenticator app.</p>
+        <form onSubmit={handleEmailCode} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ margin: '0 0 8px', fontSize: 14, color: '#4A6068' }}>We sent a verification code to <strong>{email}</strong>. Enter it below.</p>
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Authenticator Code</label>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification Code</label>
             <input style={inputSt} type="text" inputMode="numeric" maxLength={6} value={code} onChange={e => setCode(e.target.value)} placeholder="123456" required autoFocus />
           </div>
           {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 7, padding: '10px 14px', fontSize: 13, color: '#DC2626' }}>{error}</div>}
