@@ -11,6 +11,10 @@ function dbToOrder(row) {
     total: Number(row.total),
     date: row.date,
     status: row.status,
+    paymentStatus: row.payment_status ?? 'unpaid',
+    payfastPaymentId: row.payfast_payment_id ?? '',
+    paymentStatus: row.payment_status ?? 'unpaid',
+    payfastPaymentId: row.payfast_payment_id ?? '',
     items: row.items || [],
   };
 }
@@ -38,9 +42,13 @@ export function useOrders() {
       phone: order.phone || '',
       item_count: order.itemCount,
       total: order.total,
+      payment_status: 'unpaid',
       date: order.date,
+      delivery_address: order.deliveryAddress || {},
       status: order.status,
+      payment_status: 'unpaid',
       items: order.items || [],
+      delivery_address: order.deliveryAddress || {},
     };
     const { data, error } = await supabase
       .from('orders')

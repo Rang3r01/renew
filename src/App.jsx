@@ -5,11 +5,20 @@ import { StorePage } from './pages/StorePage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { CartPage } from './pages/CartPage';
 import { AdminPage } from './pages/AdminPage';
+import { PaymentSuccessPage } from './pages/PaymentSuccessPage';
+import { PaymentCancelPage } from './pages/PaymentCancelPage';
 import { ClerkSignInModal, ClerkSignUpModal } from './components/ClerkAuthUI';
 import { TweaksPanel, TweakSection, TweakToggle, TweakColor } from './components/TweaksPanel';
 import { useTweaks } from './hooks/useTweaks';
 import { useProducts } from './hooks/useProducts';
 import { useOrders } from './hooks/useOrders';
+
+function getInitialPage() {
+  const path = window.location.pathname;
+  if (path === '/payment-success') return 'payment-success';
+  if (path === '/payment-cancel') return 'payment-cancel';
+  return 'landing';
+}
 
 export function App() {
   const { user: clerkUser, isLoaded } = useUser();
@@ -26,7 +35,7 @@ export function App() {
   const { products, loading: productsLoading, saveProduct, deleteProduct } = useProducts();
   const { orders, loading: ordersLoading, createOrder } = useOrders();
 
-  const [page, setPage] = useState('landing');
+  const [page, setPage] = useState(getInitialPage);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState('signin');
   const [cart, setCart] = useState([]);
@@ -35,7 +44,13 @@ export function App() {
   const TWEAK_DEFAULTS = { accentColor: '#2BB5C8', darkNav: true, roundedCards: true };
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
-  const navigate = (pg) => setPage(pg);
+  const navigate = (pg) => {
+    setPage(pg);
+    // Clean up URL when navigating away from payment result pages
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
+  };
 
   useEffect(() => {
     if (isLoaded && user && page === 'landing') {
@@ -71,19 +86,8 @@ export function App() {
 
   const handleRemoveFromCart = (id) => setCart(prev => prev.filter(i => i.id !== id));
 
-  const handleCheckout = async () => {
-    const orderTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-    const newOrder = {
-      id: 'RNW-' + Math.floor(10000 + Math.random() * 90000),
-      customer: user?.name || 'Customer',
-      email: user?.email || '',
-      phone: '',
-      itemCount: cart.reduce((s, i) => s + i.qty, 0),
-      total: orderTotal,
-      date: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
-      status: 'pending',
-      items: cart.map(i => ({ name: i.name, brand: i.brand, qty: i.qty, price: i.price })),
-    };
+  // Called by CartPage with the fully-formed order object before redirecting to Payfast
+  const handleCheckout = async (newOrder) => {
     await createOrder(newOrder);
     setCart([]);
   };
@@ -99,6 +103,23 @@ export function App() {
   const handleViewProduct = (product) => { setSelectedProduct(product); setPage('product'); };
 
   const accentStyle = { '--accent': tweaks.accentColor || '#2BB5C8' };
+
+  // Payment result pages are shown regardless of auth state
+  if (page === 'payment-success') {
+    return (
+      <div style={accentStyle}>
+        <PaymentSuccessPage onNavigate={navigate} />
+      </div>
+    );
+  }
+
+  if (page === 'payment-cancel') {
+    return (
+      <div style={accentStyle}>
+        <PaymentCancelPage onNavigate={navigate} />
+      </div>
+    );
+  }
 
   if (!isLoaded || (user && (productsLoading || ordersLoading))) {
     return (
