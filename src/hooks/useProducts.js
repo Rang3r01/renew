@@ -30,7 +30,27 @@ export function useProducts() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  useEffect(() => {
+    fetchProducts();
+
+    const channel = supabase
+      .channel('products-realtime')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'products' }, (payload) => {
+        const updated = dbToProduct(payload.new);
+        setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'products' }, (payload) => {
+        const inserted = dbToProduct(payload.new);
+        setProducts(prev => [...prev.filter(p => p.id !== inserted.id), inserted]
+          .sort((a, b) => a.id - b.id));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'products' }, (payload) => {
+        setProducts(prev => prev.filter(p => p.id !== payload.old.id));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchProducts]);
 
   const saveProduct = useCallback(async (product, imageFile) => {
     let image_url = product.image_url || '';

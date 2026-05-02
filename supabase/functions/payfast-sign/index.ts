@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createHash } from "node:crypto";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,23 +7,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-function buildSignatureString(params: Record<string, string>, passphrase: string): string {
-  const sorted = Object.keys(params)
-    .sort()
-    .filter((k) => params[k] !== "" && params[k] !== undefined)
-    .map((k) => `${k}=${encodeURIComponent(params[k]).replace(/%20/g, "+")}`)
-    .join("&");
-  return passphrase
-    ? `${sorted}&passphrase=${encodeURIComponent(passphrase).replace(/%20/g, "+")}`
-    : sorted;
+function md5hex(message: string): string {
+  return createHash("md5").update(message, "utf8").digest("hex");
 }
 
-async function md5hex(message: string): Promise<string> {
-  const buf = new TextEncoder().encode(message);
-  const hash = await crypto.subtle.digest("MD5", buf);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+const FIELD_ORDER = [
+  "merchant_id",
+  "merchant_key",
+  "return_url",
+  "cancel_url",
+  "notify_url",
+  "name_first",
+  "name_last",
+  "email_address",
+  "m_payment_id",
+  "amount",
+  "item_name",
+];
+
+function buildSignatureString(data: Record<string, string>, passphrase: string): string {
+  const pfParamString = FIELD_ORDER
+    .filter(key => data[key] && data[key] !== "")
+    .map(key => `${key}=${encodeURIComponent(data[key].toString().trim()).replace(/%20/g, "+")}`)
+    .join("&");
+
+  return passphrase
+    ? `${pfParamString}&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, "+")}`
+    : pfParamString;
 }
 
 Deno.serve(async (req: Request) => {
@@ -31,9 +42,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const merchantId = Deno.env.get("PAYFAST_MERCHANT_ID");
-    const merchantKey = Deno.env.get("PAYFAST_MERCHANT_KEY");
-    const passphrase = Deno.env.get("PAYFAST_PASSPHRASE") ?? "";
+    const merchantId = (Deno.env.get("PAYFAST_MERCHANT_ID") ?? "").trim();
+    const merchantKey = (Deno.env.get("PAYFAST_MERCHANT_KEY") ?? "").trim();
+    const passphrase = (Deno.env.get("PAYFAST_PASSPHRASE") ?? "").trim();
     const sandboxMode = Deno.env.get("PAYFAST_SANDBOX_MODE") !== "false";
 
     if (!merchantId || !merchantKey) {
@@ -44,7 +55,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { orderId, amount, firstName, lastName, email, itemName } = body;
+    const { orderId, amount, firstName, lastName, email, itemName, appOrigin } = body;
 
     if (!orderId || !amount || !firstName || !email) {
       return new Response(
@@ -54,42 +65,54 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    // Extract the project ref to build the app URL — fall back to the Supabase URL origin
-    const appOrigin = supabaseUrl; // ITN notify URL stays on Supabase functions
     const notifyUrl = `${supabaseUrl}/functions/v1/payfast-notify`;
 
-    // return_url and cancel_url point back to the front-end
-    // We embed the order ID as a query param so the result pages can display it
-    const returnBase = req.headers.get("origin") ?? supabaseUrl;
-    const returnUrl = `${returnBase}/payment-success?order=${orderId}`;
-    const cancelUrl = `${returnBase}/payment-cancel?order=${orderId}`;
+    const origin = (appOrigin || req.headers.get("origin") || supabaseUrl).replace(/\/$/, "");
+    const returnUrl = `${origin}/payment-success`;
+    const cancelUrl = `${origin}/payment-cancel`;
 
-    const params: Record<string, string> = {
+    const safeItemName = (itemName ?? `Order ${orderId}`)
+      .substring(0, 100)
+      .replace(/[^a-zA-Z0-9 \-_]/g, "")
+      .trim();
+
+    // Single shared payload — used for both signature and form fields.
+    // All values are trimmed here so the form receives the exact same strings
+    // that were hashed.
+    const data: Record<string, string> = {
       merchant_id: merchantId,
       merchant_key: merchantKey,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,
-      name_first: firstName,
-      name_last: lastName ?? "",
-      email_address: email,
-      m_payment_id: orderId,
+      name_first: firstName.trim(),
+      email_address: email.trim(),
+      m_payment_id: String(orderId).trim(),
       amount: Number(amount).toFixed(2),
-      item_name: itemName ?? `Order ${orderId}`,
+      item_name: safeItemName,
     };
 
-    const sigString = buildSignatureString(params, passphrase);
-    const signature = await md5hex(sigString);
+    const trimmedLastName = (lastName ?? "").trim();
+    if (trimmedLastName !== "") {
+      data.name_last = trimmedLastName;
+    }
+
+    const finalString = buildSignatureString(data, passphrase);
+    console.log("PF STRING:", finalString);
+
+    const signature = md5hex(finalString);
+    console.log("PF SIGNATURE:", signature);
 
     const payfastUrl = sandboxMode
       ? "https://sandbox.payfast.co.za/eng/process"
       : "https://www.payfast.co.za/eng/process";
 
     return new Response(
-      JSON.stringify({ params: { ...params, signature }, payfastUrl }),
+      JSON.stringify({ params: { ...data, signature }, payfastUrl }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
+    console.error("payfast-sign error:", err);
     return new Response(
       JSON.stringify({ error: String(err) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

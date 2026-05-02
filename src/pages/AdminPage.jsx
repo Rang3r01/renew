@@ -2,10 +2,12 @@ import { useState, useRef } from 'react';
 import { useResponsive } from '../hooks/useResponsive';
 
 const STATUS_STYLES = {
+  paid:       { background: '#ECFDF5', color: '#059669' },
   delivered:  { background: '#ECFDF5', color: '#059669' },
   confirmed:  { background: '#EFF6FF', color: '#2563EB' },
   pending:    { background: '#FFFBEB', color: '#D97706' },
   cancelled:  { background: '#FEF2F2', color: '#DC2626' },
+  failed:     { background: '#FEF2F2', color: '#DC2626' },
 };
 
 const EMPTY_PRODUCT = { name:'', brand:'', category:'Supplements', price:'', stock:'', description:'', features:'', active:true, image:null, image_url:'', _isNew:true };
@@ -362,6 +364,7 @@ export function AdminPage({ products, orders, onSaveProduct, onDeleteProduct, on
               </div>
             ))}
           </div>
+          <DeliverySection deliveryAddress={selectedOrder.deliveryAddress} />
           <div style={{ padding:'20px 22px' }}>
             {(selectedOrder.items||[]).map((item, i) => (
               <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 50px 100px 100px', gap:10, padding:'11px 12px', borderBottom:'1px solid #F0F4F7', alignItems:'center' }}>
@@ -418,6 +421,7 @@ export function AdminPage({ products, orders, onSaveProduct, onDeleteProduct, on
                     <span style={{ fontSize:15, fontWeight:800, color:'#1A8A9A' }}>R {o.total.toLocaleString('en-ZA',{minimumFractionDigits:2})}</span>
                   </div>
                 </div>
+                <DeliverySection deliveryAddress={o.deliveryAddress} compact />
                 {(o.items||[]).map((item, ii) => (
                   <div key={ii} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 16px', borderBottom:'1px solid #F0F4F7', fontSize:13 }}>
                     <div style={{ flex:1 }}><span style={{ fontWeight:600, color:'#1a2b30' }}>{item.name}</span><span style={{ color:'#9AABB0' }}> · {item.brand}</span></div>
@@ -503,6 +507,54 @@ export function AdminPage({ products, orders, onSaveProduct, onDeleteProduct, on
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DeliverySection({ deliveryAddress, compact = false }) {
+  if (!deliveryAddress) return null;
+  const isPickup = !deliveryAddress.fulfillment || deliveryAddress.fulfillment === 'pickup';
+  const isPudo = deliveryAddress.deliveryMethod === 'pudo';
+  const pad = compact ? '10px 16px' : '14px 22px';
+  const bg = isPickup ? 'rgba(43,181,200,0.06)' : 'rgba(26,138,154,0.06)';
+  const border = isPickup ? 'rgba(43,181,200,0.2)' : 'rgba(26,138,154,0.2)';
+  const iconColor = '#1A8A9A';
+
+  const methodLabel = isPickup
+    ? 'Store Pickup'
+    : isPudo ? 'PUDO Locker (Courier Guy)'
+    : 'Door-to-Door (Courier Guy)';
+
+  return (
+    <div style={{ padding: compact ? '0 16px 10px' : '0 22px 14px', borderBottom:'1px solid #E8EEF0' }}>
+      <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: pad, display:'flex', alignItems: 'flex-start', gap:10 }}>
+        {isPickup ? (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink:0, marginTop:2 }}>
+            <path d="M2 6.5L8 2l6 4.5V14H10v-3H6v3H2V6.5Z" stroke={iconColor} strokeWidth="1.5" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink:0, marginTop:2 }}>
+            <path d="M8 1.5C5.515 1.5 3.5 3.515 3.5 6c0 3.75 4.5 8.5 4.5 8.5S12.5 9.75 12.5 6c0-2.485-2.015-4.5-4.5-4.5Z" stroke={iconColor} strokeWidth="1.5"/>
+            <circle cx="8" cy="6" r="1.5" fill={iconColor}/>
+          </svg>
+        )}
+        <div>
+          <div style={{ fontSize: compact ? 10 : 11, fontWeight:700, color:'#9AABB0', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
+            {isPickup ? 'Fulfillment' : 'Delivery Method'}
+          </div>
+          <div style={{ fontSize: compact ? 12 : 13, fontWeight:700, color:'#1A8A9A', marginBottom: (!isPickup && deliveryAddress.address) ? 4 : 0 }}>
+            {methodLabel}
+          </div>
+          {!isPickup && deliveryAddress.address && (
+            <div style={{ fontSize: compact ? 12 : 13, fontWeight:600, color:'#1a2b30', lineHeight:1.5 }}>
+              {deliveryAddress.address}
+              {(deliveryAddress.city || deliveryAddress.postal) && (
+                <span style={{ color:'#4A6068' }}>, {[deliveryAddress.city, deliveryAddress.postal].filter(Boolean).join(' ')}</span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

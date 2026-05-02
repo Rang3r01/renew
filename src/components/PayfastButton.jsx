@@ -24,6 +24,7 @@ export function PayfastButton({ order, onError, style }) {
           lastName: order.lastName ?? '',
           email: order.email,
           itemName: `Renew Health Supplies Order ${order.id}`,
+          appOrigin: window.location.origin,
         }),
       });
 
@@ -38,6 +39,7 @@ export function PayfastButton({ order, onError, style }) {
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = payfastUrl;
+      form.target = '_top';
       Object.entries(params).forEach(([key, value]) => {
         const input = document.createElement('input');
         input.type = 'hidden';

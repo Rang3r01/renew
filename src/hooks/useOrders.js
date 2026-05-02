@@ -13,9 +13,8 @@ function dbToOrder(row) {
     status: row.status,
     paymentStatus: row.payment_status ?? 'unpaid',
     payfastPaymentId: row.payfast_payment_id ?? '',
-    paymentStatus: row.payment_status ?? 'unpaid',
-    payfastPaymentId: row.payfast_payment_id ?? '',
     items: row.items || [],
+    deliveryAddress: row.delivery_address || null,
   };
 }
 
@@ -32,7 +31,23 @@ export function useOrders() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    fetchOrders();
+
+    const channel = supabase
+      .channel('orders-realtime')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        const updated = dbToOrder(payload.new);
+        setOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        const inserted = dbToOrder(payload.new);
+        setOrders(prev => [inserted, ...prev.filter(o => o.id !== inserted.id)]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchOrders]);
 
   const createOrder = useCallback(async (order) => {
     const payload = {
@@ -46,9 +61,7 @@ export function useOrders() {
       date: order.date,
       delivery_address: order.deliveryAddress || {},
       status: order.status,
-      payment_status: 'unpaid',
       items: order.items || [],
-      delivery_address: order.deliveryAddress || {},
     };
     const { data, error } = await supabase
       .from('orders')
@@ -63,5 +76,5 @@ export function useOrders() {
     return null;
   }, []);
 
-  return { orders, loading, createOrder };
+  return { orders, loading, createOrder, refreshOrders: fetchOrders };
 }

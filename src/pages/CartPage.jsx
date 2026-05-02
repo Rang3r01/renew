@@ -4,27 +4,80 @@ import { PayfastButton } from '../components/PayfastButton';
 
 const fmt = (n) => `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
 
+const SHIPPING = { pickup: 0, pudo: 80, door2door: 150 };
+
+const FULFILLMENT_OPTIONS = [
+  {
+    val: 'pickup',
+    title: 'Store Pickup',
+    sub: 'Collect from our store',
+    price: 'Free',
+  },
+  {
+    val: 'delivery',
+    title: 'Delivery',
+    sub: 'Courier Guy — choose a delivery method',
+    price: 'From R 80.00',
+  },
+];
+
+const DELIVERY_METHODS = [
+  {
+    val: 'pudo',
+    title: 'PUDO Locker',
+    sub: 'Drop off / collect at a Courier Guy locker',
+    price: 'R 80.00',
+    addressLabel: 'Closest Locker Location',
+    addressPlaceholder: 'e.g. Clicks Sandton City, Shop 12',
+  },
+  {
+    val: 'door2door',
+    title: 'Door-to-Door',
+    sub: 'Delivered directly to your address',
+    price: 'R 150.00',
+    addressLabel: 'Street Address',
+    addressPlaceholder: 'e.g. 12 Main Street, Sandton',
+  },
+];
+
 export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
   const { isMobile } = useResponsive();
   const [step, setStep] = useState('cart');
-  const [form, setForm] = useState({ firstName:'', lastName:'', email:'', phone:'', address:'', city:'', postal:'' });
+  const [form, setForm] = useState({
+    firstName: '', lastName: '', email: '', phone: '',
+    fulfillment: 'pickup',
+    deliveryMethod: '',
+    address: '', city: '', postal: '',
+  });
   const [errors, setErrors] = useState({});
   const [pendingOrder, setPendingOrder] = useState(null);
   const [payError, setPayError] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const shippingCost = form.fulfillment === 'pickup'
+    ? 0
+    : form.deliveryMethod === 'pudo' ? 80
+    : form.deliveryMethod === 'door2door' ? 150
+    : 0;
+
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const total = subtotal;
+  const total = subtotal + shippingCost;
 
   const validate = () => {
     const e = {};
     if (!form.firstName) e.firstName = 'Required';
     if (!form.lastName)  e.lastName  = 'Required';
     if (!form.email.includes('@')) e.email = 'Valid email required';
-    if (!form.phone)    e.phone    = 'Required';
-    if (!form.address)  e.address  = 'Required';
-    if (!form.city)     e.city     = 'Required';
-    if (!form.postal)   e.postal   = 'Required';
+    if (!form.phone) e.phone = 'Required';
+    if (form.fulfillment === 'delivery') {
+      if (!form.deliveryMethod) e.deliveryMethod = 'Please choose a delivery method';
+      if (!form.address) e.address = 'Required';
+      if (form.deliveryMethod === 'door2door') {
+        if (!form.city)   e.city   = 'Required';
+        if (!form.postal) e.postal = 'Required';
+      }
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -32,7 +85,6 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
   const handleProceedToPayment = async () => {
     if (!validate()) return;
     setPayError('');
-    // Create the order record in a pending state before redirecting to Payfast
     const orderId = 'RNW-' + Math.floor(10000 + Math.random() * 90000);
     const newOrder = {
       id: orderId,
@@ -44,15 +96,16 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
       date: new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }),
       status: 'pending',
       items: cart.map(i => ({ name: i.name, brand: i.brand, qty: i.qty, price: i.price })),
+      deliveryAddress: {
+        fulfillment: form.fulfillment,
+        deliveryMethod: form.fulfillment === 'delivery' ? form.deliveryMethod : null,
+        address: form.address,
+        city: form.city,
+        postal: form.postal,
+      },
     };
     await onCheckout(newOrder);
-    setPendingOrder({
-      id: orderId,
-      total,
-      firstName: form.firstName,
-      lastName: form.lastName,
-      email: form.email,
-    });
+    setPendingOrder({ id: orderId, total, firstName: form.firstName, lastName: form.lastName, email: form.email });
     setStep('payment');
   };
 
@@ -62,6 +115,12 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
     color: '#1a2b30', fontFamily: "'DM Sans',sans-serif", background: '#fff',
   });
   const labelSt = { display: 'block', fontSize: 11, fontWeight: 700, color: '#4A6068', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' };
+
+  const shippingLabel = form.fulfillment === 'pickup'
+    ? 'Store Pickup'
+    : form.deliveryMethod === 'pudo' ? 'PUDO Locker'
+    : form.deliveryMethod === 'door2door' ? 'Door-to-Door'
+    : 'Delivery';
 
   return (
     <div style={{ fontFamily: "'DM Sans',sans-serif", background: '#EEF2F5', minHeight: '100vh' }}>
@@ -94,8 +153,6 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
           </div>
         ) : (
           <div style={{ maxWidth: 1140, margin: '0 auto', padding: isMobile ? '0 12px 80px' : '0 32px 60px', display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
-
-            {/* Cart items */}
             <div>
               {cart.map(item => (
                 <div key={item.id} style={{ background: '#fff', borderRadius: 12, padding: isMobile ? '14px' : '16px 20px', display: 'flex', gap: 16, marginBottom: 10, border: '1px solid #E4EAF0', alignItems: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -132,11 +189,11 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#4A6068', marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid #E8EEF0' }}>
                 <span>Shipping</span>
-                <span style={{ color: '#2BB5C8', fontWeight: 600 }}>Free</span>
+                <span style={{ color: '#9AABB0', fontWeight: 500, fontSize: 12 }}>Calculated at checkout</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, color: '#1a2b30', marginBottom: 20 }}>
-                <span>Total</span>
-                <span style={{ fontSize: 18 }}>{fmt(total)}</span>
+                <span>Subtotal</span>
+                <span style={{ fontSize: 18 }}>{fmt(subtotal)}</span>
               </div>
               <button
                 style={{ width: '100%', background: '#2BB5C8', color: '#fff', border: 'none', borderRadius: 9, padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}
@@ -153,9 +210,70 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
       {step === 'checkout' && (
         <div style={{ maxWidth: 1140, margin: '0 auto', padding: isMobile ? '0 12px 80px' : '0 32px 60px', display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 320px', gap: 24, alignItems: 'start' }}>
 
-          {/* Delivery form */}
+          {/* Form */}
           <div style={{ background: '#fff', borderRadius: 12, padding: isMobile ? '20px 16px' : '28px', border: '1px solid #E4EAF0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#1a2b30', marginBottom: 20 }}>Delivery Details</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1a2b30', marginBottom: 20 }}>Order Details</div>
+
+            {/* ── Fulfillment top-level ── */}
+            <div style={{ marginBottom: form.fulfillment === 'delivery' ? 16 : 20 }}>
+              <label style={labelSt}>Fulfillment Method <span style={{ color: '#DC2626' }}>*</span></label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {FULFILLMENT_OPTIONS.map(({ val, title, sub, price }) => {
+                  const active = form.fulfillment === val;
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => { set('fulfillment', val); if (val === 'pickup') set('deliveryMethod', ''); }}
+                      style={{ border: `2px solid ${active ? '#2BB5C8' : '#DDE4E8'}`, borderRadius: 10, padding: '14px 12px', background: active ? 'rgba(43,181,200,0.05)' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s, background 0.15s', fontFamily: "'DM Sans',sans-serif" }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${active ? '#2BB5C8' : '#C8D4D8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {active && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2BB5C8' }} />}
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#1a2b30' }}>{title}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#9AABB0', marginBottom: 6, paddingLeft: 24 }}>{sub}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#2BB5C8' : '#4A6068', paddingLeft: 24 }}>{price}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── Delivery sub-methods ── */}
+            {form.fulfillment === 'delivery' && (
+              <div style={{ marginBottom: 20, padding: '16px', background: '#F8FAFB', borderRadius: 10, border: '1px solid #E8EEF0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#4A6068', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                  Courier Guy — Delivery Method <span style={{ color: '#DC2626' }}>*</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
+                  {DELIVERY_METHODS.map(({ val, title, sub, price }) => {
+                    const active = form.deliveryMethod === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => { set('deliveryMethod', val); set('address', ''); set('city', ''); set('postal', ''); }}
+                        style={{ border: `2px solid ${active ? '#1A8A9A' : '#DDE4E8'}`, borderRadius: 10, padding: '14px 12px', background: active ? 'rgba(26,138,154,0.06)' : '#fff', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s, background 0.15s', fontFamily: "'DM Sans',sans-serif" }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${active ? '#1A8A9A' : '#C8D4D8'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {active && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1A8A9A' }} />}
+                          </div>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#1a2b30' }}>{title}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#9AABB0', marginBottom: 6, paddingLeft: 24 }}>{sub}</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#1A8A9A' : '#4A6068', paddingLeft: 24 }}>{price}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {errors.deliveryMethod && <div style={{ fontSize: 11, color: '#DC2626', marginTop: 8 }}>{errors.deliveryMethod}</div>}
+              </div>
+            )}
+
+            {/* ── Contact fields ── */}
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, marginBottom: 14 }}>
               {[['firstName','First Name'],['lastName','Last Name'],['email','Email'],['phone','Phone']].map(([k,l]) => (
                 <div key={k}>
@@ -165,20 +283,36 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
                 </div>
               ))}
             </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelSt}>Street Address</label>
-              <input style={inputSt(errors.address)} value={form.address} onChange={e => set('address', e.target.value)} />
-              {errors.address && <div style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{errors.address}</div>}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              {[['city','City'],['postal','Postal Code']].map(([k,l]) => (
-                <div key={k}>
-                  <label style={labelSt}>{l}</label>
-                  <input style={inputSt(errors[k])} value={form[k]} onChange={e => set(k, e.target.value)} />
-                  {errors[k] && <div style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{errors[k]}</div>}
-                </div>
-              ))}
-            </div>
+
+            {/* ── Address fields (shown once a delivery method is chosen) ── */}
+            {form.fulfillment === 'delivery' && form.deliveryMethod && (() => {
+              const method = DELIVERY_METHODS.find(m => m.val === form.deliveryMethod);
+              return (
+                <>
+                  <div style={{ marginBottom: form.deliveryMethod === 'door2door' ? 14 : 0 }}>
+                    <label style={labelSt}>{method.addressLabel}</label>
+                    <input
+                      style={inputSt(errors.address)}
+                      value={form.address}
+                      placeholder={method.addressPlaceholder}
+                      onChange={e => set('address', e.target.value)}
+                    />
+                    {errors.address && <div style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{errors.address}</div>}
+                  </div>
+                  {form.deliveryMethod === 'door2door' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      {[['city','City'],['postal','Postal Code']].map(([k,l]) => (
+                        <div key={k}>
+                          <label style={labelSt}>{l}</label>
+                          <input style={inputSt(errors[k])} value={form[k]} onChange={e => set(k, e.target.value)} />
+                          {errors[k] && <div style={{ fontSize: 11, color: '#DC2626', marginTop: 3 }}>{errors[k]}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Order summary sidebar */}
@@ -198,7 +332,10 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
                 <span>Subtotal</span><span>{fmt(subtotal)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#4A6068', marginBottom: 16 }}>
-                <span>Shipping</span><span style={{ color: '#2BB5C8', fontWeight: 600 }}>Free</span>
+                <span>{shippingLabel}</span>
+                <span style={{ fontWeight: 600, color: shippingCost === 0 ? '#2BB5C8' : '#1a2b30' }}>
+                  {shippingCost === 0 ? 'Free' : fmt(shippingCost)}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 700, color: '#1a2b30', marginBottom: 20 }}>
                 <span>Total</span><span>{fmt(total)}</span>
@@ -232,15 +369,16 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
               <div style={{ fontSize: 13, color: '#9AABB0' }}>Order <strong style={{ color: '#1a2b30' }}>{pendingOrder.id}</strong></div>
             </div>
 
-            {/* Summary */}
             <div style={{ background: '#F8FBFC', border: '1px solid #E4EAF0', borderRadius: 10, padding: '16px 20px', marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#4A6068', marginBottom: 8 }}>
-                <span>Items</span>
-                <span>{cart.reduce((s, i) => s + i.qty, 0)}</span>
+                <span>Subtotal</span>
+                <span>{fmt(subtotal)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#4A6068', marginBottom: 8 }}>
-                <span>Shipping</span>
-                <span style={{ color: '#2BB5C8', fontWeight: 600 }}>Free</span>
+                <span>{shippingLabel}</span>
+                <span style={{ fontWeight: 600, color: shippingCost === 0 ? '#2BB5C8' : '#1a2b30' }}>
+                  {shippingCost === 0 ? 'Free' : fmt(shippingCost)}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#1a2b30', paddingTop: 10, borderTop: '1px solid #E4EAF0' }}>
                 <span>Total</span>
@@ -254,10 +392,7 @@ export function CartPage({ cart, onUpdateCart, onRemove, onBack, onCheckout }) {
               </div>
             )}
 
-            <PayfastButton
-              order={pendingOrder}
-              onError={(msg) => setPayError(msg)}
-            />
+            <PayfastButton order={pendingOrder} onError={(msg) => setPayError(msg)} />
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9AABB0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
