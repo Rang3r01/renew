@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { colors, typography } from '../theme';
 
 const SIGN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payfast-sign`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -14,7 +15,6 @@ export function PayfastButton({ order, onError, style }) {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${ANON_KEY}`,
-          // Pass the app origin so the edge function can build correct return_url / cancel_url
           Origin: window.location.origin,
         },
         body: JSON.stringify({
@@ -35,7 +35,6 @@ export function PayfastButton({ order, onError, style }) {
 
       const { params, payfastUrl } = await res.json();
 
-      // Build a hidden form and POST it to Payfast
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = payfastUrl;
@@ -62,15 +61,15 @@ export function PayfastButton({ order, onError, style }) {
       type="button"
       style={{
         width: '100%',
-        background: loading ? '#9AABB0' : '#0E9F6E',
-        color: '#fff',
+        background: loading ? colors.textTertiary : colors.payfastGreen,
+        color: colors.white,
         border: 'none',
         borderRadius: 9,
         padding: '14px',
         fontSize: 15,
         fontWeight: 700,
         cursor: loading ? 'default' : 'pointer',
-        fontFamily: "'DM Sans',sans-serif",
+        fontFamily: typography.fontFamily,
         transition: 'background 0.2s',
         display: 'flex',
         alignItems: 'center',
